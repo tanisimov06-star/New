@@ -26,9 +26,11 @@ sys_memory = {
 
 logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-api_key=""
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+api_key = os.getenv("OPENROUTER_API_KEY")
+
 model="openrouter/free"
-BOT_TOKEN = ""
+
 
 def user_memory(user_id) -> list:
     user_id_str = str(user_id)
