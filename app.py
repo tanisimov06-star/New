@@ -52,7 +52,7 @@ def search_gemini(query: str) -> str:
         )
         
         response = gemini_client.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.0-flash",
             contents=query,
             config=GenerateContentConfig(
                 tools=[google_search_tool],
