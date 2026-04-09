@@ -5,7 +5,8 @@ import requests
 import json
 import os
 import asyncio
-import google.generativeai as genai
+from google import genai
+from google.genai.types import Tool, GoogleSearch, GenerateContentConfig
 
 
 
@@ -30,35 +31,50 @@ sys_memory = {
 
 logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-gemini_api = os.getenv("GEMINI_API_KEY")
-if gemini_api:
-    genai.configure(api_key=gemini_api)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
     GEMINI_AVAILABLE = True
 else:
+    gemini_client = None
     GEMINI_AVAILABLE = False
-    print("Ключ не задан")
+    print("⚠️ GEMINI_API_KEY не задан")
 
 def search_gemini(query: str) -> str:
+    
+    
     if not GEMINI_AVAILABLE:
-        return "Ключ не задан"
+        return "❌ Поиск недоступен: API-ключ не задан"
+    
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")
-        response = model.generate_content (
-            query,
-            tools = [genai.Tool("google_search")]
+        google_search_tool = Tool(
+            google_search=GoogleSearch()
         )
+        
+        response = gemini_client.models.generate_content(
+            model="gemini-2.0-flash-exp",
+            contents=query,
+            config=GenerateContentConfig(
+                tools=[google_search_tool],
+                response_modalities=["TEXT"],
+            )
+        )
+        
         answer = response.text
-        if hasattr(response, 'candidates') and response.candidates:
+        
+        
+        if response.candidates and response.candidates[0].grounding_metadata:
             grounding = response.candidates[0].grounding_metadata
-            if grounding and hasattr(grounding, 'grounding_chunks'):
-                sources = grounding.grounding_chunks
-                if sources:
-                    answer += "\n\n **Источники:**"
-                    for src in sources[:3]:
-                        if hasattr(src, 'web'):
-                            answer += f"\n {src.web.title}: {src.web.uri}"
+            if hasattr(grounding, 'grounding_chunks') and grounding.grounding_chunks:
+                answer += "\n\n📚 **Источники:**"
+                for chunk in grounding.grounding_chunks[:3]:
+                    if hasattr(chunk, 'web'):
+                        answer += f"\n• {chunk.web.title}: {chunk.web.uri}"
+        
+        return answer
+        
     except Exception as e:
-        return f"Ошибка поиска: {e} "
+        return f"❌ Ошибка поиска: {e}"
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 api_key = os.getenv("OPENROUTER_API_KEY")
@@ -120,14 +136,14 @@ def get_api(user_id: int, promt: str) -> str:
         save_history(memory)
         return "❌ Ошибка при обращении к AI. Попробуйте позже."
 
-async def search_com(update: Update, content: ContextTypes.DEFAULT_TYPE):
+async def search_com(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🔍 Введите поисковый запрос после команды.\n"
         "Например: `/search последние новости ИИ`",
         parse_mode="Markdown"
     )
 
-async def headle_search(update: Update, content: ContextTypes.DEFAULT_TYPE):
+async def headle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
 
     if user_message.startswith("/search"):
