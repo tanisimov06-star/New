@@ -4,6 +4,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import requests
 import json
 import os
+import asyncio
+import google.generativeai as genai
+
+
 
 def save_history(messages):
     with open("history_bot.json", "w", encoding="utf-8") as f:
@@ -25,6 +29,36 @@ sys_memory = {
 }
 
 logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+gemini_api = os.getenv("GEMINI_API_KEY")
+if gemini_api:
+    genai.configure(api_key=gemini_api)
+    GEMINI_AVAILABLE = True
+else:
+    GEMINI_AVAILABLE = False
+    print("Ключ не задан")
+
+def search_gemini(query: str) -> str:
+    if not GEMINI_AVAILABLE:
+        return "Ключ не задан"
+    try:
+        model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        response = model.generate_content (
+            query,
+            tools = [genai.Tool("google_search")]
+        )
+        answer = response.text
+        if hasattr(response, 'candidates') and response.candidates:
+            grounding = response.candidates[0].grounding_metadata
+            if grounding and hasattr(grounding, 'grounding_chunks'):
+                sources = grounding.grounding_chunks
+                if sources:
+                    answer += "\n\n **Источники:**"
+                    for src in sources[:3]:
+                        if hasattr(src, 'web'):
+                            answer += f"\n {src.web.title}: {src.web.uri}"
+    except Exception as e:
+        return f"Ошибка поиска: {e} "
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 api_key = os.getenv("OPENROUTER_API_KEY")
@@ -86,6 +120,28 @@ def get_api(user_id: int, promt: str) -> str:
         save_history(memory)
         return "❌ Ошибка при обращении к AI. Попробуйте позже."
 
+async def search_com(update: Update, content: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🔍 Введите поисковый запрос после команды.\n"
+        "Например: `/search последние новости ИИ`",
+        parse_mode="Markdown"
+    )
+
+async def headle_search(update: Update, content: ContextTypes.DEFAULT_TYPE):
+    user_message = update.message.text
+
+    if user_message.startswith("/search"):
+        query = user_message[7:].strip()
+    else:
+        query = user_message.strip()
+    if not query:
+        await update.message.reply_text("Введите поисковой запрос")
+        return
+    await update.message.chat.send_action(action="typing")
+    result = search_gemini(query)
+    await update.message.reply_text(result, parse_mode="Markdown")
+
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -126,6 +182,13 @@ async def head(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     user_message = update.message.text
+
+    search_triggers = ["найди", "поищи", "кто такой", "найти", "поиск", "узнай", "кто",]
+    is_search = any (trigger in user_message.lower() for trigger in search_triggers)
+    if is_search or user_message.startswith("/search"):
+        await headle_search(update, context)
+        return
+
     if not user_message.strip():
         await update.message.reply_text("Пожалуйста введите текст")
         return
@@ -138,6 +201,7 @@ async def head(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("search", search_com))
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_comm ))
     app.add_handler(CommandHandler("clear", clear_comm))
