@@ -94,6 +94,8 @@ def search_with_openrouter(query: str) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
+         "HTTP-Referer": "https://t.me/MySmartAssistant228Bot",  
+        "X-Title": "Telegram AI Bot"
     }
     
     for model in model_to_try:
