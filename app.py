@@ -93,9 +93,9 @@ def search_with_openrouter(query: str) -> str:
     
     try:
         response = requests.post(url, headers=headers, json=data, timeout=30)
-        
-        print(f"Статус ответа: {response.status_code}")
-        print(f"Тело ответа: {response.text}")
+
+        if response.status_code != 200:
+            return f"API статус {response.status_code}\n\n{response.text[:500]}"
 
         response.raise_for_status()
         result = response.json()
