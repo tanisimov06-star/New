@@ -76,6 +76,14 @@ logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)
 #         return f"❌ Ошибка поиска: {e}"
 
 def search_with_openrouter(query: str) -> str:
+
+    model_to_try= [
+         "meta-llama/llama-4-maverick:free",
+        "meta-llama/llama-4-scout:free",
+        "google/gemini-2.5-pro-exp-03-25:free",
+        "zhipuai/glm-4-flash-250207:free"
+]
+
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
@@ -83,25 +91,26 @@ def search_with_openrouter(query: str) -> str:
         "Content-Type": "application/json",
     }
     
-    data = {
-        "model": "google/gemini-2.0-flash-exp:free",
-        "messages": [{"role": "user", "content": query}],
-        "tools": [{"type": "web_search"}],
-        "temperature": 0.7,
-        "max_tokens": 500
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=data, timeout=30)
+    for model in model_to_try:
+        try:
+            data = {
+            "model": model,
+            "messages": [{"role": "user", "content": query}],
+            "tools": [{"type": "web_search"}],
+            "temperature": 0.7,
+            "max_tokens": 500
+        }
+            response = requests.post(url, headers=headers, json=data, timeout=30)
 
-        if response.status_code != 200:
-            return f"API статус {response.status_code}\n\n{response.text[:500]}"
+            if response.status_code != 200:
+                return f"API статус {response.status_code}\n\n{response.text[:500]}"
 
-        response.raise_for_status()
-        result = response.json()
-        return result['choices'][0]['message']['content']
-    except Exception as e:
-        return f"❌ Ошибка поиска: {e}"
+            response.raise_for_status()
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        except:
+            continue
+    return "Ни одна модель недоступна на данный момент времени"
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 api_key = os.getenv("OPENROUTER_API_KEY")
