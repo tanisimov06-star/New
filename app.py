@@ -51,7 +51,7 @@ def search_deepseek(query: str) -> str:
         return "❌ Поиск недоступен: API-ключ не задан"
     
     try:
-        response = deepseek_client.models.generate_content(
+        response = deepseek_client.chat.completions.create(
             model="deepseek-chat",
             messages = [{"role": "user", "content": query}],
             temperature = 0.7,
