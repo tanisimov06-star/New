@@ -76,45 +76,56 @@ logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)
 #         return f"❌ Ошибка поиска: {e}"
 
 def search_with_openrouter(query: str) -> str:
-
-    model_to_try= [
-    "qwen/qwen3.6-plus-preview:free",        
-    "meta-llama/llama-4-maverick:free",      
-    "zhipuai/glm-4-flash-250207:free",      
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "meta-llama/llama-4-scout:free",         
-    "google/gemini-2.5-flash-preview-04-17:free", 
-    "google/gemini-2.5-pro-exp-03-25:free",  
-    "google/gemini-2.0-flash-1b:free"        
-]
-
+    models_to_try = [
+        "openrouter/free:online",           
+        "qwen/qwen3.6-plus-preview:free",   
+        "meta-llama/llama-4-maverick:free", 
+        "quasar-alpha:free",                
+        "zhipuai/glm-4-flash-250207:free",  
+    ]
+    
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-         "HTTP-Referer": "https://t.me/MySmartAssistant228Bot",  
+        "HTTP-Referer": "https://t.me/MySmartAssistant228Bot",
         "X-Title": "Telegram AI Bot"
     }
     
-    for model in model_to_try:
+    for model in models_to_try:
         try:
-            data = {
-            "model": model,
-            "messages": [{"role": "user", "content": query}],
-            "tools": [{"type": "web_search"}],
-            "temperature": 0.7,
-            "max_tokens": 500
-        }
+            
+            if model.endswith(":online"):
+                data = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": query}],
+                    "temperature": 0.7,
+                    "max_tokens": 500
+                }
+            else:
+                
+                data = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": query}],
+                    "tools": [{"type": "web_search"}],
+                    "temperature": 0.7,
+                    "max_tokens": 500
+                }
+            
             response = requests.post(url, headers=headers, json=data, timeout=30)
-
+            
             if response.status_code == 200:
                 result = response.json()
+                logging.info(f"✅ Поиск сработал с моделью: {model}")
                 return result['choices'][0]['message']['content']
-        except:
+            else:
+                logging.warning(f"Модель {model} вернула {response.status_code}: {response.text[:100]}")
+        except Exception as e:
+            logging.error(f"Ошибка с моделью {model}: {e}")
             continue
-    return "Ни одна модель недоступна на данный момент времени"
+    
+    return "❌ Ни одна модель поиска недоступна. Попробуйте позже."
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 api_key = os.getenv("OPENROUTER_API_KEY")
