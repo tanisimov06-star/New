@@ -84,7 +84,7 @@ def search_with_openrouter(query: str) -> str:
     }
     
     data = {
-        "model": "openrouter/free",
+        "model": "google/gemini-2.0-flash-exp:free",
         "messages": [{"role": "user", "content": query}],
         "tools": [{"type": "web_search"}],
         "temperature": 0.7,
