@@ -93,6 +93,10 @@ def search_with_openrouter(query: str) -> str:
     
     try:
         response = requests.post(url, headers=headers, json=data, timeout=30)
+        
+        print(f"Статус ответа: {response.status_code}")
+        print(f"Тело ответа: {response.text}")
+
         response.raise_for_status()
         result = response.json()
         return result['choices'][0]['message']['content']
