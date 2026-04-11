@@ -78,10 +78,15 @@ logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)
 def search_with_openrouter(query: str) -> str:
 
     model_to_try= [
-        "meta-llama/llama-4-maverick:free",
-        "meta-llama/llama-4-scout:free",
-        "google/gemini-2.5-pro-exp-03-25:free",
-        "zhipuai/glm-4-flash-250207:free"
+         "qwen/qwen3.6-plus-preview:free",        
+    "meta-llama/llama-4-maverick:free",      
+    "zhipuai/glm-4-flash-250207:free",      
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "meta-llama/llama-4-scout:free",         
+    "google/gemini-2.5-flash-preview-04-17:free", 
+    "google/gemini-2.5-pro-exp-03-25:free",  
+    "google/gemini-2.0-flash-1b:free"        
 ]
 
     url = "https://openrouter.ai/api/v1/chat/completions"
