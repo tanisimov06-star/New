@@ -78,7 +78,7 @@ logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)
 def search_with_openrouter(query: str) -> str:
 
     model_to_try= [
-         "qwen/qwen3.6-plus-preview:free",        
+    "qwen/qwen3.6-plus-preview:free",        
     "meta-llama/llama-4-maverick:free",      
     "zhipuai/glm-4-flash-250207:free",      
     "nvidia/nemotron-3-super-120b-a12b:free",
