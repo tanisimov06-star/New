@@ -31,47 +31,71 @@ sys_memory = {
 logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
-DEEPSEEK_KEY_API = os.getenv("DEEPSEEK_KEY_API")
-if DEEPSEEK_KEY_API:
-    deepseek_client = OpenAI (
-        api_key=DEEPSEEK_KEY_API,
-        base_url= "https://api.deepseek.com"
-    )
-    DEEPSEEK_AVAILABLE = True
-else:
-    deepseek_client = None
-    DEEPSEEK_AVAILABLE = False
-    print("Ключ API не задан!")
+# DEEPSEEK_KEY_API = os.getenv("DEEPSEEK_KEY_API")
+# if DEEPSEEK_KEY_API:
+#     deepseek_client = OpenAI (
+#         api_key=DEEPSEEK_KEY_API,
+#         base_url= "https://api.deepseek.com"
+#     )
+#     DEEPSEEK_AVAILABLE = True
+# else:
+#     deepseek_client = None
+#     DEEPSEEK_AVAILABLE = False
+#     print("Ключ API не задан!")
 
 
-def search_deepseek(query: str) -> str:
+# def search_deepseek(query: str) -> str:
     
     
-    if not DEEPSEEK_AVAILABLE:
-        return "❌ Поиск недоступен: API-ключ не задан"
+#     if not DEEPSEEK_AVAILABLE:
+#         return "❌ Поиск недоступен: API-ключ не задан"
+    
+#     try:
+#         response = deepseek_client.chat.completions.create(
+#             model="deepseek-chat",
+#             messages = [{"role": "user", "content": query}],
+#             temperature = 0.7,
+#             max_tokens = 500,
+#             tools = [{"type": "web_search"}]
+#             )
+        
+        
+#         answer = response.choices[0].message.content
+        
+        
+#         if response.choices[0].message.tool_calls:
+#             answer += "\n\n📚 **Источники:**"
+#             for tool in response.choices[0].message.tool_calls:
+#                 if tool.type == "web_search" and hasattr(tool, 'web_search'):
+#                     url = tool.web_search.url if hasattr(tool.web_search, 'url') else str(tool.web_search)
+#                     answer += f"\n• {url}"
+        
+#         return answer
+        
+#     except Exception as e:
+#         return f"❌ Ошибка поиска: {e}"
+
+def search_with_openrouter(query: str) -> str:
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    
+    data = {
+        "model": "openrouter/free",
+        "messages": [{"role": "user", "content": query}],
+        "tools": [{"type": "web_search"}],
+        "temperature": 0.7,
+        "max_tokens": 500
+    }
     
     try:
-        response = deepseek_client.chat.completions.create(
-            model="deepseek-chat",
-            messages = [{"role": "user", "content": query}],
-            temperature = 0.7,
-            max_tokens = 500,
-            tools = [{"type": "web_search"}]
-            )
-        
-        
-        answer = response.choices[0].message.content
-        
-        
-        if response.choices[0].message.tool_calls:
-            answer += "\n\n📚 **Источники:**"
-            for tool in response.choices[0].message.tool_calls:
-                if tool.type == "web_search" and hasattr(tool, 'web_search'):
-                    url = tool.web_search.url if hasattr(tool.web_search, 'url') else str(tool.web_search)
-                    answer += f"\n• {url}"
-        
-        return answer
-        
+        response = requests.post(url, headers=headers, json=data, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        return result['choices'][0]['message']['content']
     except Exception as e:
         return f"❌ Ошибка поиска: {e}"
 
@@ -153,7 +177,7 @@ async def headle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Введите поисковой запрос")
         return
     await update.message.chat.send_action(action="typing")
-    result = search_deepseek(query)
+    result = search_with_openrouter(query)
     await update.message.reply_text(result, parse_mode="Markdown")
 
 
