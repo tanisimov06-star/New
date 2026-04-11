@@ -5,8 +5,7 @@ import requests
 import json
 import os
 import asyncio
-from google import genai
-from google.genai.types import Tool, GoogleSearch, GenerateContentConfig
+from openai import OpenAI
 
 
 
@@ -31,45 +30,45 @@ sys_memory = {
 
 logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-    GEMINI_AVAILABLE = True
-else:
-    gemini_client = None
-    GEMINI_AVAILABLE = False
-    print("⚠️ GEMINI_API_KEY не задан")
 
-def search_gemini(query: str) -> str:
+DEEPSEEK_KEY_API = os.getenv("DEEPSEEK_KEY_API")
+if DEEPSEEK_KEY_API:
+    deepseek_client = OpenAI (
+        api_key=DEEPSEEK_KEY_API,
+        base_url= "https://api.deepseek.com"
+    )
+    DEEPSEEK_AVAILABLE = True
+else:
+    deepseek_client = None
+    DEEPSEEK_AVAILABLE = False
+    print("Ключ API не задан!")
+
+
+def search_deepseek(query: str) -> str:
     
     
-    if not GEMINI_AVAILABLE:
+    if not DEEPSEEK_AVAILABLE:
         return "❌ Поиск недоступен: API-ключ не задан"
     
     try:
-        google_search_tool = Tool(
-            google_search=GoogleSearch()
-        )
-        
-        response = gemini_client.models.generate_content(
-            model="gemini-2.0-flash-lite",
-            contents=query,
-            config=GenerateContentConfig(
-                tools=[google_search_tool],
-                response_modalities=["TEXT"],
+        response = deepseek_client.models.generate_content(
+            model="deepseek-chat",
+            messages = [{"role": "user", "content": query}],
+            temperature = 0.7,
+            max_tokens = 500,
+            tools = [{"type": "web_search"}]
             )
-        )
-        
-        answer = response.text
         
         
-        if response.candidates and response.candidates[0].grounding_metadata:
-            grounding = response.candidates[0].grounding_metadata
-            if hasattr(grounding, 'grounding_chunks') and grounding.grounding_chunks:
-                answer += "\n\n📚 **Источники:**"
-                for chunk in grounding.grounding_chunks[:3]:
-                    if hasattr(chunk, 'web'):
-                        answer += f"\n• {chunk.web.title}: {chunk.web.uri}"
+        answer = response.choices[0].message.content
+        
+        
+        if response.choices[0].message.tool_calls:
+            answer += "\n\n📚 **Источники:**"
+            for tool in response.choices[0].message.tool_calls:
+                if tool.type == "web_search" and hasattr(tool, 'web_search'):
+                    url = tool.web_search.url if hasattr(tool.web_search, 'url') else str(tool.web_search)
+                    answer += f"\n• {url}"
         
         return answer
         
@@ -154,7 +153,7 @@ async def headle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Введите поисковой запрос")
         return
     await update.message.chat.send_action(action="typing")
-    result = search_gemini(query)
+    result = search_deepseek(query)
     await update.message.reply_text(result, parse_mode="Markdown")
 
 
