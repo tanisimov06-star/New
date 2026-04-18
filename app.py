@@ -12,7 +12,7 @@ import PyPDF2
 import docx
 
 
-embedder = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
 chroma_client = chromadb.Client()
 collection = chroma_client.create_collection(name ='documents')
 
