@@ -6,8 +6,48 @@ import json
 import os
 import asyncio
 from openai import OpenAI
+import chromadb
+from sentence_transformers import SentenceTransformer
+import PyPDF2
+import docx
 
 
+embedder = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+chroma_client = chromadb.Client()
+collection = chroma_client.create_collection(name ='documents')
+
+
+def text_from_pdf(file_path: str) -> str:
+    text = ""
+    with open(file_path, 'rb') as f:
+        reader = PyPDF2.PdfReader(f)
+        for page in reader.page:
+            text += page.extract_text()
+    return text
+
+def text_from_docx(file_path: str) -> str:
+    doc = docx.Document(file_path)
+    return "\n".join([para.text for para in doc.paragraphs])
+def text_chunk(text: str, chunk_size: int=500) -> list:
+    words = text.split()
+    chunk = []
+    for i in range(0, len(words), chunk_size):
+        chunk.append(" ".join(words[i:i + chunk_size]))
+    return chunk
+def vector_db(chunk: list, doc_id: str):
+    embeddings = embedder.encode(chunk).tolist()
+    collection.add(
+        embeddings=embeddings,
+        documents=chunk,
+        ids=[f"{doc_id}_{i}" for i in range(len(chunk))]
+    )
+def search(query: str, top_k:  int=3)->list:
+    query_embedding = embedder.encode([query]).tolist()
+    result = collection.query(
+        query_embeddings=query_embedding,
+        n_results=top_k
+    )
+    return result["documents"][0] if result["documents"] else []
 
 def save_history(messages):
     with open("history_bot.json", "w", encoding="utf-8") as f:
@@ -31,57 +71,9 @@ sys_memory = {
 logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
-# DEEPSEEK_KEY_API = os.getenv("DEEPSEEK_KEY_API")
-# if DEEPSEEK_KEY_API:
-#     deepseek_client = OpenAI (
-#         api_key=DEEPSEEK_KEY_API,
-#         base_url= "https://api.deepseek.com"
-#     )
-#     DEEPSEEK_AVAILABLE = True
-# else:
-#     deepseek_client = None
-#     DEEPSEEK_AVAILABLE = False
-#     print("Ключ API не задан!")
-
-
-# def search_deepseek(query: str) -> str:
-    
-    
-#     if not DEEPSEEK_AVAILABLE:
-#         return "❌ Поиск недоступен: API-ключ не задан"
-    
-#     try:
-#         response = deepseek_client.chat.completions.create(
-#             model="deepseek-chat",
-#             messages = [{"role": "user", "content": query}],
-#             temperature = 0.7,
-#             max_tokens = 500,
-#             tools = [{"type": "web_search"}]
-#             )
-        
-        
-#         answer = response.choices[0].message.content
-        
-        
-#         if response.choices[0].message.tool_calls:
-#             answer += "\n\n📚 **Источники:**"
-#             for tool in response.choices[0].message.tool_calls:
-#                 if tool.type == "web_search" and hasattr(tool, 'web_search'):
-#                     url = tool.web_search.url if hasattr(tool.web_search, 'url') else str(tool.web_search)
-#                     answer += f"\n• {url}"
-        
-#         return answer
-        
-#     except Exception as e:
-#         return f"❌ Ошибка поиска: {e}"
-
 def search_with_openrouter(query: str) -> str:
     models_to_try = [
-        "openrouter/free:online",           
-        "qwen/qwen3.6-plus-preview:free",   
-        "meta-llama/llama-4-maverick:free", 
-        "quasar-alpha:free",                
-        "zhipuai/glm-4-flash-250207:free",  
+        "openrouter/free:online", 
     ]
     
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -243,12 +235,49 @@ async def clear_comm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def head_document(update: Update, context):
+    file = await update.message.document.get_file()
+    file_path = f"temp_{update.message.document.file_name}"
+    await file.download_to_drive(file_path)
 
+    if update.message.document.file_name.endswith('.docx'):
+        text = text_from_docx(file_path)
+    elif update.message.document.file_name.endswith('.pdf'):
+        text = text_from_pdf(file_path)
+    else:
+        await update.message.reply_text("Поддериживаем только файлы PDF и DOCX")
+        return
+    chunk = text_chunk(text)
+    vector_db(chunk, str(update.effective_user.id))
+    await update.message.reply_text(f"Документ обработан! Добавлено {len(chunk)} фрагментов")
+
+async def ask_question(update: Update, context):
+    query = update.message.text
+    relevant_chunk = search(query)
+    if not relevant_chunk:
+        await update.message.reply_text("Не нашел ответ в зугруженных документах")
+        return 
+    context_text = "\n\n---\n\n".join(relevant_chunk)
+    promt = f"""Ответь на вопрос, используя ТОЛЬКО информацию из документов ниже.
+Документы:
+{context_text}
+Вопросы:
+{query}
+Ответ (со ссылкой на документ, если возможно):"""
+    answer = get_api(update.effective_user.id, promt)
+    await update.message.reply_text(answer)
 
 async def head(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     user_message = update.message.text
+
+    doc_triggers = ["найди в документе", "поищи в документе", "по документу", "согласно документу ", "в документе","исходя из документа",
+    "где в документе"]
+    if any(trigger in user_message.lower() for trigger in doc_triggers):
+        await ask_question(update, context)
+        return
+
 
     search_triggers = ["найди", "поищи", "кто такой", "найти", "поиск", "узнай", "кто",]
     is_search = any (trigger in user_message.lower() for trigger in search_triggers)
@@ -273,6 +302,7 @@ def main():
     app.add_handler(CommandHandler("help", help_comm ))
     app.add_handler(CommandHandler("clear", clear_comm))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, head))
+    app.add_handler(MessageHandler(filters.Document.ALL, head_document))
     print("AI-бот запущен...")
     app.run_polling()
 
