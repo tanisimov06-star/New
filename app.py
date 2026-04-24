@@ -12,9 +12,17 @@ import PyPDF2
 import docx
 
 
-embedder = SentenceTransformer('all-MiniLM-L6-v2')
+embedder = SentenceTransformer('paraphrase-albert-small-v2')
 chroma_client = chromadb.Client()
-collection = chroma_client.create_collection(name ='documents')
+collection = chroma_client.create_collection(
+    
+    name ='documents',
+    metadata={
+        "hnsw:space": "cosine",
+        "hnsw:construction_ef": 100,
+        "hnsw:M": 16  
+    }
+)
 
 
 def text_from_pdf(file_path: str) -> str:
