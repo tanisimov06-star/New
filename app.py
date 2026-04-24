@@ -70,13 +70,29 @@ def load_history():
         
 
 memory = load_history()  
+user_mode = {}
 
-sys_memory = {
-    "role": "system",
-    "content": "Ты полезный помощник, отвечай коротко и по делу"
-}
+async def mode_com(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id_str = str(update.effective_user.id)
+    text = " ".join(context.args)
+    if not text:
+        current = user_mode.get(user_id_str, "Ты обычный помощник")
+        await update.message.reply_text(f"Текущая роль: {current}")
+        return
+    user_mode[user_id_str] = text
+    await update.message.reply_text(f"Режим изменен на:{text}")
+
+
+
+
+def get_system_con(user_id_str: str) -> str:
+    if user_id_str in user_mode:
+        return f"Ты {user_mode[user_id_str]}. Отвечай соответственно своей роли"
+    return "Ты полезный помощник отвечай кратко"
 
 logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+
 
 
 def search_with_openrouter(query: str) -> str:
@@ -136,7 +152,7 @@ model="openrouter/free"
 def user_memory(user_id) -> list:
     user_id_str = str(user_id)
     if user_id_str not in memory:
-        memory[user_id_str] = [sys_memory.copy()]
+        memory[user_id_str] = [{"role": "system", "content": get_system_con(user_id_str)}]
         save_history(memory)
     return memory[user_id_str]
     
@@ -219,7 +235,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Команды:\n"
         "/start - показать это сообщение\n"
         "/help - помощь\n"
-        "/clear - очистить историю диалога")
+        "/clear - очистить историю диалога\n"
+        "/search - поиск в интернете")
 
 async def help_comm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -229,12 +246,13 @@ async def help_comm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Команды:\n"
         "/clear - очистить историю диалога (если добавлю память)\n"
         "/start - главное меню"
+        "/search - поиск в интернете"
     )
 async def clear_comm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id  = update.effective_user.id
     user_id_str = str(user_id)
 
-    memory[user_id_str] = [sys_memory.copy()]
+    memory[user_id_str] = [{"role": "system", "content": get_system_con(user_id_str)}]
     save_history(memory)
 
     await update.message.reply_text(
@@ -305,6 +323,7 @@ async def head(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("mode", mode_com))
     app.add_handler(CommandHandler("search", search_com))
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_comm ))
