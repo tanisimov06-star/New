@@ -68,7 +68,6 @@ def load_history():
     except FileNotFoundError:
         return {}
         
-
 memory = load_history()  
 user_mode = {}
 
@@ -80,10 +79,18 @@ async def mode_com(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Текущая роль: {current}")
         return
     user_mode[user_id_str] = text
+    new_role = {"role": "system", "content": f"Ты {text}. Отвечай соответсвенно своей роли"}
+    if user_id_str not in memory:
+        memory[user_id_str] = [new_role]
+        else:
+            for i, msg in enumerate(memory[user_id_str]):
+                if msg.get("role") == "system":
+                    memory[user_id_str][i] = new_role
+                    bteak
+            else:
+                memoryp[user_id_str].insert(0, new_role)
+    save_history(memory)                    
     await update.message.reply_text(f"Режим изменен на:{text}")
-
-
-
 
 def get_system_con(user_id_str: str) -> str:
     if user_id_str in user_mode:
@@ -91,9 +98,6 @@ def get_system_con(user_id_str: str) -> str:
     return "Ты полезный помощник отвечай кратко"
 
 logging.basicConfig(format= '%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-
-
-
 
 def search_with_openrouter(query: str) -> str:
     models_to_try = [
@@ -148,7 +152,6 @@ api_key = os.getenv("OPENROUTER_API_KEY")
 
 model="openrouter/free"
 
-
 def user_memory(user_id) -> list:
     user_id_str = str(user_id)
     if user_id_str not in memory:
@@ -159,9 +162,6 @@ def user_memory(user_id) -> list:
 def get_api(user_id: int, promt: str) -> str:
 
     user_id_str = str(user_id)
-
-
-
 
     base_url="https://openrouter.ai/api/v1/chat/completions"
     
@@ -224,8 +224,6 @@ async def headle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = search_with_openrouter(query)
     await update.message.reply_text(result, parse_mode="Markdown")
 
-
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
@@ -259,7 +257,6 @@ async def clear_comm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🧹 История диалога очищена!\n"
         "Теперь мы начинаем разговор с чистого листа."
     )
-
 
 # async def head_document(update: Update, context):
 #     file = await update.message.document.get_file()
@@ -304,7 +301,6 @@ async def head(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #     await ask_question(update, context)
     #     return
 
-
     search_triggers = ["найди", "поищи", "кто такой", "найти", "поиск", "узнай", "кто",]
     is_search = any (trigger in user_message.lower() for trigger in search_triggers)
     if is_search or user_message.startswith("/search"):
@@ -318,8 +314,6 @@ async def head(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ai_answer = get_api(user_id, user_message)      
     await update.message.reply_text(ai_answer)
     
-
-
 def main():
     
     app = ApplicationBuilder().token(BOT_TOKEN).build()
