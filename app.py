@@ -82,13 +82,13 @@ async def mode_com(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_role = {"role": "system", "content": f"Ты {text}. Отвечай соответсвенно своей роли"}
     if user_id_str not in memory:
         memory[user_id_str] = [new_role]
-        else:
+    else:
             for i, msg in enumerate(memory[user_id_str]):
                 if msg.get("role") == "system":
                     memory[user_id_str][i] = new_role
-                    bteak
+                    break
             else:
-                memoryp[user_id_str].insert(0, new_role)
+                memory[user_id_str].insert(0, new_role)
     save_history(memory)                    
     await update.message.reply_text(f"Режим изменен на:{text}")
 
