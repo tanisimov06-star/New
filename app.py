@@ -79,7 +79,7 @@ async def mode_com(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Текущая роль: {current}")
         return
     user_mode[user_id_str] = text
-    new_role = {"role": "system", "content": f"Ты {text}. Отвечай соответсвенно своей роли"}
+    new_role = {"role": "system", "content": text}
     if user_id_str not in memory:
         memory[user_id_str] = [new_role]
     else:
@@ -164,7 +164,7 @@ def get_api(user_id: int, promt: str) -> str:
     user_id_str = str(user_id)
 
     role_text = user_mode.get(user_id_str, "полезный помощник, отвечай кратко и по делу")
-    system_message = {"role": "system", "content": f"Ты {role_text}. Отвечай соответсвенно своей роли"}
+    enhanced_promt = f"[Твоя роль: {role_text}] {promt}"
 
     base_url="https://openrouter.ai/api/v1/chat/completions"
     
@@ -173,14 +173,13 @@ def get_api(user_id: int, promt: str) -> str:
         "Content-Type": "application/json",
         
     }
-
     history = user_memory(user_id)
 
     if history and history[0].get("role") == "system":
         history = history[1:]
 
-    message = [system_message] + history
-    message.append({"role": "user", "content": promt})
+    message = history.copy()
+    message.append({"role": "user", "content": enhanced_promt})
     save_history(memory)
 
     data = {
@@ -192,7 +191,6 @@ def get_api(user_id: int, promt: str) -> str:
     }
     try:
         response = requests.post(base_url, headers=headers, json=data, timeout=30)
-        
         response.raise_for_status()
         result = response.json()
         ai = result['choices'][0]['message']['content'].strip()
@@ -201,7 +199,7 @@ def get_api(user_id: int, promt: str) -> str:
         save_history(memory)
 
         if len(history) > 20:
-            memory[user_id_str] = [system_message] + history[-19:]
+            memory[user_id_str] = history[-19:]
             save_history(memory)
         return ai    
     
