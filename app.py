@@ -163,6 +163,9 @@ def get_api(user_id: int, promt: str) -> str:
 
     user_id_str = str(user_id)
 
+    role_text = user_mode.get(user_id_str, "полезный помощник, отвечай кратко и по делу")
+    system_message = {"role": "system", "content": f"Ты {role_text}. Отвечай соответсвенно своей роли"}
+
     base_url="https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
@@ -172,12 +175,17 @@ def get_api(user_id: int, promt: str) -> str:
     }
 
     history = user_memory(user_id)
-    history.append({"role": "user", "content": promt})
+
+    if history and history[0].get("role") == "system":
+        history = history[1:]
+
+    message = [system_message] + history
+    message.append({"role": "user", "content": promt})
     save_history(memory)
 
     data = {
         "model": model,
-        "messages": history,
+        "messages": message,
         "temperature": 0.7,
         "max_tokens": 500
         
@@ -188,12 +196,12 @@ def get_api(user_id: int, promt: str) -> str:
         response.raise_for_status()
         result = response.json()
         ai = result['choices'][0]['message']['content'].strip()
-        
+        history.append({"role": "user", "content": promt})
         history.append({"role": "assistant", "content": ai})
         save_history(memory)
 
         if len(history) > 20:
-            memory[user_id_str] = [history[0]] + history[-19:]
+            memory[user_id_str] = [system_message] + history[-19:]
             save_history(memory)
         return ai    
     
